@@ -2,7 +2,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SEKAI_UNITY_VERSION = "2022.3.21f1"
+DEFAULT_SEKAI_UNITY_VERSION = "2022.3.62f2"
 _sssekai_unity_version = DEFAULT_SEKAI_UNITY_VERSION
 
 
