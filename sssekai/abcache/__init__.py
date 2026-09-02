@@ -293,7 +293,7 @@ class AbCache(Session):
             case "en":
                 return f"https://n-{self.SEKAI_API_PROFILE}-game-api.sekai-en.com"
             case "tw":
-                return "https://mk-zian-obt-cdn.bytedgame.com"
+                return "https://mkovs-20004-cdn.bytedgame.com"
             case "kr":
                 return "https://mkkorea-obt-prod01-cdn.bytedgame.com"
             case "cn":
