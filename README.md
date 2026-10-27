@@ -1,4 +1,7 @@
 # sssekai
+
+This repository is a fork of [mos9527/sssekai](https://github.com/mos9527/sssekai).
+
 [![Windows Build](https://github.com/mos9527/sssekai/actions/workflows/python-publish.yml/badge.svg)](https://github.com/mos9527/sssekai/blob/main/.github/workflows/python-publish.yml) [![Releases](https://img.shields.io/github/downloads/mos9527/sssekai/total.svg)](https://GitHub.com/mos9527/sssekai/releases/) [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black) 
 
 Command-line tool (w/Python API support) for Project SEKAI (JP: プロジェクトセカイ カラフルステージ！ feat.初音ミク) game assets.
