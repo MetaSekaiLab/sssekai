@@ -44,6 +44,10 @@ def main_il2cpp(*args, **kwargs):
     from sssekai.entrypoint.il2cpp import main_il2cpp
     return main_il2cpp(*args, **kwargs)
 
+def main_il2cppextract(*args, **kwargs):
+    from sssekai.entrypoint.il2cppextract import main_il2cppextract
+    return main_il2cppextract(*args, **kwargs)
+
 def main_mvdata(*args, **kwargs):
     from sssekai.entrypoint.mvdata import main_mvdata
     return main_mvdata(*args, **kwargs)
@@ -453,6 +457,20 @@ This crypto applies to:
         **gooey_only(widget="DirChooser"),
     )
     il2cpp_parser.set_defaults(func=main_il2cpp)
+    il2cppextract_parser = subparsers.add_parser(
+        "il2cpp-extract",
+        help="Prepare IL2CPP analysis inputs from a JP Android ARM64 APK/XAPK",
+        description="Extract APK/XAPK inputs and run the existing il2cpp command.",
+    )
+    il2cppextract_parser.add_argument(
+        "infile", help="input APK or XAPK (including ARM64 splits)",
+        **gooey_only(widget="FileChooser"),
+    )
+    il2cppextract_parser.add_argument(
+        "outdir", help="output analysis directory",
+        **gooey_only(widget="DirChooser"),
+    )
+    il2cppextract_parser.set_defaults(func=main_il2cppextract)
     # mvdata
     mvdata_parser = subparsers.add_parser(
         "mvdata", usage="""Extract MV Data from AssetBundle"""
