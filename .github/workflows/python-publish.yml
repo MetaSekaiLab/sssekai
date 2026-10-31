@@ -15,6 +15,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONUTF8: '1'
+
 concurrency:
   group: publish
   cancel-in-progress: false
