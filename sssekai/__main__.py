@@ -436,12 +436,12 @@ This crypto applies to:
     # il2cpp
     il2cpp_parser = subparsers.add_parser(
         "il2cpp",
-        usage="""extract il2cpp binary with deobfuscated metadata from **JP Android** releases""",
+        description="Extract IL2CPP inputs from JP/EN/CN/TW/KR Android releases; detect metadata format automatically.",
     )
     il2cpp_parser.add_argument(
         "metadata",
         type=str,
-        help="the global-metadata.dat file at com.sega.pjsekai/assets/bin/Data/Managed/Metadata",
+        help="the global-metadata.dat file at assets/bin/Data/Managed/Metadata",
         **gooey_only(widget="FileChooser"),
     )
     il2cpp_parser.add_argument(
@@ -459,7 +459,7 @@ This crypto applies to:
     il2cpp_parser.set_defaults(func=main_il2cpp)
     il2cppextract_parser = subparsers.add_parser(
         "il2cpp-extract",
-        help="Prepare IL2CPP analysis inputs from a JP Android ARM64 APK/XAPK",
+        help="Prepare IL2CPP analysis inputs from a JP/EN/CN/TW/KR Android ARM64 APK/XAPK",
         description="Extract APK/XAPK inputs and run the existing il2cpp command.",
     )
     il2cppextract_parser.add_argument(
