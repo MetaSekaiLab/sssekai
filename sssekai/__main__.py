@@ -512,12 +512,13 @@ def __main__():
     parser = create_parser(argparse.ArgumentParser)
     args = parser.parse_args()
     # set logging level
-    from logging import basicConfig
+    import coloredlogs
 
-    basicConfig(
+    coloredlogs.install(
         level=args.log_level,
-        format="%(asctime)s | %(levelname).1s | %(name)s %(message)s",
+        fmt="%(asctime)s | %(levelname).1s | %(name)s %(message)s",
         datefmt="%H:%M:%S",
+        isatty=True,
         stream=TqdmMutexStream,
     )
     # override unity version
@@ -535,13 +536,4 @@ def __main__():
 
 
 if __name__ == "__main__":
-    import coloredlogs
-
-    coloredlogs.install(
-        level=args.log_level,
-        format="%(asctime)s | %(levelname).1s | %(name)s %(message)s",
-        datefmt="%H:%M:%S",
-        isatty=True,
-        stream=TqdmMutexStream,
-    )    
     sys.exit(__main__() or 0)
