@@ -1,107 +1,91 @@
 name: Publish
 
 on:
-  workflow_run:
-    workflows: Tests
-    branches: main
-    types: completed
   workflow_dispatch:
     inputs:
       release_pypi:
-        description: 'Create a new PyPI release'
+        description: 'Publish to PyPI'
         type: boolean
-        required: true
         default: true
       release_github:
-        description: 'Create a new GitHub release'
+        description: 'Build and release Windows executables'
         type: boolean
-        required: true
-        default: true        
-     
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
 jobs:
-  build-and-release:
-    # XXX: Nobody expects the `contains()` repetition
-    if: github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_commit.message, 'Version') || github.event.inputs.release_pypi || github.event.inputs.release_github
+  build:
+    if: inputs.release_pypi || inputs.release_github
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.11'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install --upgrade setuptools wheel build twine packaging
-        python -m pip install --upgrade Pyinstaller
-        python -m pip install -e .[il2cpp]
-        python -m pip install -e .
-        python setup.py install
-    - name: Build package (PyPI)
-      if: contains(github.event.workflow_run.head_commit.message, 'Version') || github.event.inputs.release_pypi
-      run: python -m build --no-isolation
-    - name: Publish package (PyPI)
-      if: contains(github.event.workflow_run.head_commit.message, 'Version') || github.event.inputs.release_pypi
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-      run: |
-        twine upload ./dist/*.whl --skip-existing
-        twine upload ./dist/*.tar.gz --skip-existing
-    - name: Build Windows executable (GitHub)
-      if: contains(github.event.workflow_run.head_commit.message, 'Version') || github.event.inputs.release_github
-      run: |          
-          pyinstaller sssekai.spec  
-    - name: Install GUI Dependencies
-      if: contains(github.event.workflow_run.head_commit.message, 'Version') || github.event.inputs.release_github
-      run: |
-          python -m pip install -e .[gui]
-    - name: Build Windows executable (GUI, GitHub)
-      if: contains(github.event.workflow_run.head_commit.message, 'Version') || github.event.inputs.release_github
-      run: |          
-          pyinstaller sssekai-gui.spec   
-    - name : Get Version (GitHub)
-      if: contains(github.event.workflow_run.head_commit.message, 'Version') || github.event.inputs.release_github
-      id   : get_version
-      run  : |        
-        $message = @(pip show sssekai)
-        $lines = $message.Split(' ')
-        $version = $lines[3]
-        
-        Write-Output "::set-output name=version::$version"          
-    - name: Create Release (GitHub)
-      if: contains(github.event.workflow_run.head_commit.message, 'Version') || github.event.inputs.release_github
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.get_version.outputs.version }}
-        release_name: Version ${{ steps.get_version.outputs.version }}
-    - name: Upload Windows EXE (GitHub)
-      if: contains(github.event.workflow_run.head_commit.message, 'Version') || github.event.inputs.release_github
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: dist/sssekai.exe
-        asset_name: sssekai.exe
-        asset_content_type: application/application/vnd.microsoft.portable-executable
-    - name: Upload Windows EXE (GUI, GitHub)
-      if: contains(github.event.workflow_run.head_commit.message, 'Version') || github.event.inputs.release_github
-      uses: actions/upload-release-asset@v1.0.1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: dist/sssekai-gui.exe
-        asset_name: sssekai-gui.exe
-        asset_content_type: application/application/vnd.microsoft.portable-executable        
-    - name: Publish Release (GitHub)
-      if: contains(github.event.workflow_run.head_commit.message, 'Version') || github.event.inputs.release_github
-      uses: eregon/publish-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        release_id: ${{ steps.create_release.outputs.id }}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install build and test dependencies
+        run: python -m pip install build twine pytest
+      - name: Build distributions
+        run: python -m build
+      - name: Check distributions
+        run: python -m twine check --strict dist/*
+      - name: Install wheel
+        shell: pwsh
+        run: python -m pip install (Get-Item dist/*.whl).FullName
+      - name: Test
+        run: python -m pytest -v
+      - name: Check installed command
+        working-directory: ${{ runner.temp }}
+        run: sssekai --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish-pypi:
+    if: inputs.release_pypi
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/sssekai/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  release-windows:
+    if: inputs.release_github
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: python -m pip install pyinstaller ".[gui,il2cpp]"
+      - name: Build Windows executables
+        run: |
+          pyinstaller sssekai.spec
+          pyinstaller sssekai-gui.spec
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = python -c "import sssekai; print(sssekai.__version__)"
+          gh release create $version dist/sssekai.exe dist/sssekai-gui.exe --target "${{ github.sha }}" --title "Version $version" --generate-notes

@@ -30,13 +30,13 @@ from sssekai.unity import sssekai_set_unity_version
             "items": [
                 {
                     "type": "Link",
-                    "menuTitle": "Project Wiki",
-                    "url": "https://github.com/mos9527/sssekai/wiki",
+                    "menuTitle": "Report an Issue",
+                    "url": "https://github.com/MetaSekaiLab/sssekai/issues",
                 },
                 {
                     "type": "Link",
                     "menuTitle": "GitHub",
-                    "url": "https://github.com/mos9527/sssekai",
+                    "url": "https://github.com/MetaSekaiLab/sssekai",
                 },
             ],
         }
