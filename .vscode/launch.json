@@ -277,30 +277,6 @@
             "justMyCode": false
         },
         {
-            "name": "Python: Convert Sekai Character Mesh",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/sssekai/scripts/blender_mesh_importer.py",
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "args": [
-                "C:\\Users\\mos9527\\.sssekai\\abcache\\live_pv\\model\\character\\body\\21\\0001\\ladies_s"
-            ],
-            "justMyCode": false
-        },
-        {
-            "name": "Python: Dump Live2D Model Parameter names",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/sssekai/scripts/dump_moc3_assets.py",
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "args": [
-                "C:\\Users\\mos9527\\.sssekai\\abcache\\live2d\\model"
-            ],
-            "justMyCode": false
-        },
-        {
             "name": "Python: apphash",
             "type": "python",
             "request": "launch",
@@ -352,17 +328,6 @@
                 "C:\\Users\\mos9527\\Desktop\\Cache"
             ],
             "justMyCode": true
-        },
-        {
-            "name": "Python: live2dextract Generic",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/sssekai/scripts/live2dextract_generic.py",
-            "args": [
-                "C:\\Users\\Huang\\Desktop\\Data",
-                "C:\\Users\\Huang\\Desktop\\Data_result"
-            ],
-            "justMyCode": false
         },
         {
             "name": "Python: rla2json",

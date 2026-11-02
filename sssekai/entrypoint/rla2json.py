@@ -57,6 +57,7 @@ def main_rla2json(args):
                     )
             header = datas.get("sekai.rlh", None)
             assert header, "RLH Header file not found!"
+            header = json.loads(header.decode("utf-8"))
             version = tuple(map(int, header["version"].split(".")))
             logger.info("Version: %d.%d" % version)
             logger.info("Count: %d" % len(header["splitFileIds"]))

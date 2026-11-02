@@ -26,5 +26,5 @@ def register_as_anonymous_user_sega(cache: AbCache) -> SekaiUserData:
     data = cache.response_to_dict(resp)
     cache.config.auth_credential = data["credential"]
     logger.info("Success. User ID=%s" % cache.config.auth_userID)
-    cache.database.sekai_user_data = data
-    return fromdict(SekaiUserData, data)
+    cache.database.sekai_user_data = fromdict(SekaiUserData, data, False)
+    return cache.database.sekai_user_data

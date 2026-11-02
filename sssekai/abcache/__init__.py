@@ -14,6 +14,24 @@ REGION_ROW = {"tw", "kr", "cn"}
 REGION_OPTIONS = REGION_JP_EN | REGION_ROW
 
 
+class RedactedStr(str):
+    """A credential that behaves like a str but hides its value in repr.
+
+    `dataclasses.asdict` deep-copies values, so `field(repr=False)` alone does
+    not keep tokens out of `repr(asdict(...))`. Pickles as a plain str so cache
+    files stay compatible with older versions.
+    """
+
+    def __repr__(self):
+        return "<redacted>"
+
+    def __deepcopy__(self, memo):
+        return self
+
+    def __reduce_ex__(self, protocol):
+        return str, (str(self),)
+
+
 def fromdict(klass: type, d: Union[Mapping, List], warn_missing_fields=True):
     """
     Recursively convert a dictionary to a dataclass instance, if applicable.
@@ -74,7 +92,9 @@ class AbCacheConfig:
     app_platform: str
     app_hash: str
 
-    auth_credential: str = None  # JWT token for JP/EN, Base64 encoded JWT token for ROW
+    auth_credential: str = field(
+        default=None, repr=False
+    )  # JWT token for JP/EN, Base64 encoded JWT token for ROW
 
     row_ab_version: str = None  # Override AB version in url for ROW
 
@@ -83,6 +103,13 @@ class AbCacheConfig:
     asset_hash: str = None  # Override AssetBundle hash for EN/JP
 
     version: Tuple[int, int, int] = (0, 0, 0)  # Internal versioning
+
+    def __setattr__(self, name, value):
+        # Credentials are also assigned after construction (CLI, auth.py).
+        if name == "auth_credential" and value is not None:
+            if not isinstance(value, RedactedStr):
+                value = RedactedStr(value)
+        super().__setattr__(name, value)
 
     @property
     def auth_jwt(self) -> str:
@@ -209,10 +236,16 @@ class SekaiUserRegistrationData:
 class SekaiUserData:
     userRegistration: SekaiUserRegistrationData
     # JP/EN Only
-    credential: Optional[str] = None
+    credential: Optional[str] = field(default=None, repr=False)
     updatedResources: Optional[dict] = None
     # ROW
-    sessionToken: Optional[str] = None
+    sessionToken: Optional[str] = field(default=None, repr=False)
+
+    def __setattr__(self, name, value):
+        if name in ("credential", "sessionToken") and value is not None:
+            if not isinstance(value, RedactedStr):
+                value = RedactedStr(value)
+        super().__setattr__(name, value)
 
     @property
     def user_credentials(self):
@@ -221,7 +254,7 @@ class SekaiUserData:
 
 @dataclass
 class SekaiUserAuthData:
-    sessionToken: str
+    sessionToken: str = field(repr=False)
     appVersion: str
     multiPlayVersion: str
     dataVersion: str
@@ -244,11 +277,34 @@ class SekaiUserAuthData:
     cdnVersion: Optional[int] = None
     configs: Optional[List[dict]] = None
 
+    def __setattr__(self, name, value):
+        if name == "sessionToken" and value is not None:
+            if not isinstance(value, RedactedStr):
+                value = RedactedStr(value)
+        super().__setattr__(name, value)
+
+
+class RedactedHeaders(dict):
+    """Request headers kept for cache reuse. Hidden from repr/asdict so tokens
+    (e.g. X-Session-Token) never reach logs. Pickles as a plain dict so cache
+    files stay loadable by both old and new versions."""
+
+    def __repr__(self):
+        return "<headers: %d values>" % len(self)
+
+    def __deepcopy__(self, memo):
+        # dict's default deepcopy returns a plain dict, which would leak through
+        # dataclasses.asdict(). Header values are str, so a shallow copy suffices.
+        return RedactedHeaders(self)
+
+    def __reduce_ex__(self, protocol):
+        return dict, (dict(self),)
+
 
 @dataclass
 class SSSekaiDatabase:
     config: AbCacheConfig = None
-    cached_headers: dict = field(default_factory=dict)
+    cached_headers: dict = field(default_factory=RedactedHeaders)
 
     sekai_user_data: SekaiUserData = None
     sekai_user_auth_data: SekaiUserAuthData = None
@@ -256,12 +312,58 @@ class SSSekaiDatabase:
     sekai_system_data: SekaiSystemData = None
     sekai_gameversion_data: SekaiGameVersionData = None
 
+    def __repr__(self) -> str:
+        # Two layers guard this: RedactedHeaders hides its own values, and this
+        # repr also covers a plain dict (databases built by hand, or caches not
+        # yet normalized by load()) that would otherwise print in full.
+        values = ", ".join(
+            "%s=%r" % (f.name, getattr(self, f.name, None))
+            for f in fields(self)
+            if f.name != "cached_headers"
+        )
+        return "SSSekaiDatabase(%s, cached_headers=<%d values>)" % (
+            values,
+            len(self.cached_headers or ()),
+        )
+
     def reset(self):
         self.sekai_user_data = None
         self.sekai_user_auth_data = None
         self.sekai_abcache_index = None
         self.sekai_system_data = None
         self.sekai_gameversion_data = None
+
+    def redact_secrets(self):
+        """Re-wrap secrets loaded from disk as RedactedStr.
+
+        RedactedStr pickles as a plain str (so caches stay readable by older
+        versions), so values read back from a cache file must be wrapped again
+        before they can reach a repr/asdict. Assignment goes through each
+        dataclass's __setattr__, which does the wrapping.
+        """
+        if not isinstance(self.cached_headers, RedactedHeaders):
+            self.cached_headers = RedactedHeaders(self.cached_headers or {})
+        # sssekai <= 0.8.2 stored the raw API response here, so old caches may
+        # hold a plain dict (which also breaks attribute access such as
+        # SEKAI_CREDENTIAL). Normalize it to the dataclass we expect.
+        if isinstance(self.sekai_user_data, dict):
+            self.sekai_user_data = fromdict(
+                SekaiUserData, self.sekai_user_data, False
+            )
+        secrets = []
+        if self.config is not None:
+            secrets.append((self.config, ("auth_credential",)))
+        secrets += [
+            (self.sekai_user_data, ("credential", "sessionToken")),
+            (self.sekai_user_auth_data, ("sessionToken",)),
+        ]
+        for owner, names in secrets:
+            if owner is None:
+                continue
+            for name in names:
+                value = getattr(owner, name, None)
+                if value is not None:
+                    setattr(owner, name, value)
 
 
 class AbCacheBundleNotFoundError(Exception):
@@ -716,7 +818,7 @@ class AbCache(Session):
 
     def save(self, f: BinaryIO):
         self._update_request_headers()
-        self.database.cached_headers = self.headers
+        self.database.cached_headers = RedactedHeaders(self.headers)
         self.database.config.version = __version_tuple__
         logger.info("Saving cache: %s" % self)
         dump(self.database, f)
@@ -724,13 +826,15 @@ class AbCache(Session):
     def load(self, f: BinaryIO):
         logger.info("Loading cache")
         self.database = load(f)
+        # Values from disk are plain str/dict; re-wrap so they stay out of logs.
+        self.database.redact_secrets()
+        logger.info("Loaded cache: %s" % self)
         if not self.database.config.is_up_to_date:
             logger.warning(
                 "Cache is outdated (cache: %s, current: %s). It's HIGHLY recommended to update the cache to avoid issues."
                 % (self.database.config.cache_version_string, __version__)
             )
         self.headers.update(self.database.cached_headers)
-        logger.info("Cache loaded: %s" % self)
 
     @staticmethod
     def from_file(f: BinaryIO):
