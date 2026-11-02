@@ -1,0 +1,2 @@
+# Normalize text files to LF while preserving binary files.
+* text=auto eol=lf
