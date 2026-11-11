@@ -119,9 +119,9 @@ This crypto applies to:
     apidecrypt_parser.add_argument(
         "--region",
         type=str,
-        help="app region",
+        help="app region (use `cn-legacy` for CN app versions before 6.4.0)",
         default="jp",
-        choices=["jp", "tw", "en", "kr", "cn"],
+        choices=["jp", "tw", "en", "kr", "cn", "cn-legacy"],
     )
     apidecrypt_parser.set_defaults(func=main_apidecrypt)
     # abdecrypt

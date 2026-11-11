@@ -1,5 +1,5 @@
 from Crypto.Cipher import AES
-from typing import Tuple
+from typing import Optional, Tuple
 
 
 def PKCS7_pad(data: bytes, bs) -> bytes:
@@ -30,8 +30,32 @@ SEKAI_APIMANAGER_KEYSETS = {
     "jp": (b"g2fcC0ZczN9MTJ61", b"msx3IV0i9XE5uYZ1"),
     "tw": (b"g2fcC0ZczN9MTJ61", b"msx3IV0i9XE5uYZ1"),
     "kr": (b"g2fcC0ZczN9MTJ61", b"msx3IV0i9XE5uYZ1"),
-    "cn": (b"g2fcC0ZczN9MTJ61", b"msx3IV0i9XE5uYZ1"),
+    # CN switched to a new keyset since app version 6.4.0.
+    # The server picks the keyset by the `X-App-Version` request header.
+    "cn": (b"PFSeUG9v6MpohZKO", b"rJn6VC6vJhEX2xLO"),
+    "cn-legacy": (b"g2fcC0ZczN9MTJ61", b"msx3IV0i9XE5uYZ1"),
 }
+
+CN_KEYSET_SWITCH_VERSION = (6, 4, 0)
+
+
+def _parse_version(version: str) -> Tuple[int, ...]:
+    parts = []
+    for part in str(version).split("."):
+        digits = "".join(c for c in part if c.isdigit())
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts)
+
+
+def get_keyset(region: str, app_version: Optional[str] = None) -> Tuple[bytes, bytes]:
+    """Get the APIManager keyset for a region and (optionally) an app version."""
+    if region == "cn" and app_version:
+        parsed = _parse_version(app_version)
+        if parsed and parsed < CN_KEYSET_SWITCH_VERSION:
+            return SEKAI_APIMANAGER_KEYSETS["cn-legacy"]
+    return SEKAI_APIMANAGER_KEYSETS[region]
 
 
 def encrypt(data: bytes, keyset: Tuple[bytes, bytes]) -> bytes:
