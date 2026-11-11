@@ -64,7 +64,7 @@ from msgpack import unpackb, packb
 
 from sssekai import __version__, __version_tuple__
 from sssekai.unity import sssekai_get_unity_version
-from sssekai.crypto.APIManager import decrypt, encrypt, SEKAI_APIMANAGER_KEYSETS
+from sssekai.crypto.APIManager import decrypt, encrypt, get_keyset
 
 
 @dataclass
@@ -565,7 +565,7 @@ class AbCache(Session):
             # But this may change in the future, in which case consult the following issues:
             #   https://github.com/msgpack/msgpack-python/issues/326
             data = packb(data, use_single_float=True)
-            data = encrypt(data, SEKAI_APIMANAGER_KEYSETS[self.config.app_region])
+            data = encrypt(data, get_keyset(self.config.app_region, self.config.app_version))
         resp = self.request(method=method, url=url, data=data, **kwargs)
         if 400 <= resp.status_code < 600:
             logger.error(f"{method} {url} {resp.status_code}")
@@ -590,7 +590,7 @@ class AbCache(Session):
         Returns:
             dict: Decrypted and unpacked data
         """
-        data = decrypt(resp.content, SEKAI_APIMANAGER_KEYSETS[self.config.app_region])
+        data = decrypt(resp.content, get_keyset(self.config.app_region, self.config.app_version))
         data = unpackb(data, **kwargs)
         return data
 
