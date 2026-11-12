@@ -36,7 +36,8 @@ def _payload_packet(streaming_payload, sig=0):
 
 
 VALID_PAYLOAD = b"\x08\x00\x00\x00" + b"\x00\x00\x00\x00" + b"\x02\x00" + b"\x00\x00"
-# pose count = 0x7fffffff with no pose data -> array reader hits EOF
+# Bitmask header of 0x7fffffff bytes with no bitmask data: get_next_mask() runs
+# off the end of the buffer, so decoding fails part-way through the payload.
 TRUNCATED_PAYLOAD = (
     b"\x08\x00\x00\x00" + b"\x7f\xff\xff\xff" + b"\x02\x00" + b"\x00\x0c"
 )
@@ -113,12 +114,19 @@ def test_rla_truncated_payload_raises_truncated_error():
 def test_rla_truncated_payload_drops_frame_but_keeps_stream():
     from sssekai.fmt.rla import read_rla_frames
 
+    # A third frame after the truncated one proves the stream continues: an
+    # implementation that returns (instead of skipping) would yield only the
+    # first frame, which the earlier two-packet version could not distinguish.
     packets = [
         (1, _payload_packet(VALID_PAYLOAD)),
         (2, _payload_packet(TRUNCATED_PAYLOAD)),
+        (3, _payload_packet(VALID_PAYLOAD)),
     ]
     frames = list(read_rla_frames(packets, (1, 6), strict=False))
-    assert [(tick, f["type"]) for tick, f in frames] == [(1, "MotionData")]
+    assert [(tick, f["type"]) for tick, f in frames] == [
+        (1, "MotionData"),
+        (3, "MotionData"),
+    ]
 
 
 # --- Split packets ---------------------------------------------------------
@@ -167,11 +175,32 @@ def test_rla_split_group_is_cleared_after_skip():
     """A discarded group must not bleed into a later packet with the same id."""
     from sssekai.fmt.rla import read_rla_frames
 
-    bad = _split_packet(7, 0, 1, 999, b"abcdef", b64=False)
-    good_body = _payload_body(VALID_PAYLOAD)
-    good = _split_packet(7, 0, 1, len(good_body), good_body, b64=False, sig=0)
-    frames = list(read_rla_frames([(1, bad), (2, good)], (1, 6), strict=False))
-    assert [(tick, f["type"]) for tick, f in frames] == [(2, "MotionData")]
+    body = _payload_body(VALID_PAYLOAD)
+    half = len(body) // 2
+    # A stale index-0 fragment from a length-mismatched group, then a complete
+    # two-part group reusing splitId 7. If the stale fragment is not dropped it
+    # is spliced in and the reassembled payload is corrupt.
+    bad = _split_packet(7, 0, 2, 999, body[:half], b64=False, sig=0)
+    p0 = _split_packet(7, 0, 2, len(body), body[:half], b64=False, sig=0)
+    p1 = _split_packet(7, 1, 2, len(body), body[half:], b64=False, sig=0)
+    frames = list(read_rla_frames([(1, bad), (2, p0), (3, p1)], (1, 6), strict=False))
+    assert [(tick, f["type"]) for tick, f in frames] == [(3, "MotionData")]
+
+
+def test_rla_malformed_packet_does_not_complete_stale_split_group():
+    """A packet whose envelope fails to parse leaves no trustworthy splitId, so
+    pending groups are dropped; fragments from a different frame that reuse the
+    same splitId must not be spliced into a chimera payload."""
+    from sssekai.fmt.rla import read_rla_frames
+
+    body = _payload_body(VALID_PAYLOAD)
+    half = len(body) // 2
+    first = _split_packet(5, 0, 2, len(body), body[:half], b64=False, sig=0)
+    second = _split_packet(5, 1, 2, len(body), body[half:], b64=False, sig=0)
+    frames = list(
+        read_rla_frames([(1, first), (2, b"GARBAGE"), (3, second)], (1, 6), strict=False)
+    )
+    assert frames == []
 
 
 def test_rla_split_reassembles_in_index_order():
@@ -181,6 +210,8 @@ def test_rla_split_reassembles_in_index_order():
     half = len(body) // 2
     p0 = _split_packet(3, 0, 2, len(body), body[:half], b64=False, sig=0)
     p1 = _split_packet(3, 1, 2, len(body), body[half:], b64=False, sig=0)
-    # Delivered out of order; reassembly sorts by splitIndex.
-    frames = list(read_rla_frames([(2, p1), (1, p0)], (1, 6), strict=False))
+    # Delivery order is the reverse of both splitIndex and timestamp order, so
+    # an implementation that concatenates by arrival or by timestamp produces a
+    # corrupt payload and fails here.
+    frames = list(read_rla_frames([(1, p1), (2, p0)], (1, 6), strict=False))
     assert [f["type"] for _, f in frames] == ["MotionData"]

@@ -27,7 +27,7 @@ class _FakeEnv:
 
 
 def test_rla2json_archive_header_is_parsed(monkeypatch):
-    """0.7.18 regression: the RLH header is bytes but was indexed as a dict."""
+    """Regression: the RLH header is bytes but was indexed as a dict."""
     from sssekai.entrypoint import rla2json
 
     header = json.dumps(
