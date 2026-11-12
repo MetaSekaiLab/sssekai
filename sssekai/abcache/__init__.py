@@ -78,6 +78,7 @@ def fromdict(klass: type, d: Union[Mapping, List], warn_missing_fields=True):
 
 
 from requests import Session, Response, HTTPError
+from requests.structures import CaseInsensitiveDict
 from msgpack import unpackb, packb
 
 from sssekai import __version__, __version_tuple__
@@ -301,6 +302,25 @@ class RedactedHeaders(dict):
         return dict, (dict(self),)
 
 
+class RedactedSessionHeaders(CaseInsensitiveDict):
+    """`requests.Session.headers` replacement that hides its values in repr.
+
+    `load()` copies cached headers into the live session, where they are plain
+    `str` again. Without this, `repr(cache.headers)` (or `vars(cache)`) prints
+    `X-Session-Token` and CloudFront `Cookie` in full. Values stay plain `str`
+    so requests puts the real token on the wire.
+    """
+
+    def __repr__(self):
+        return "<headers: %d values>" % len(self)
+
+    def __deepcopy__(self, memo):
+        return RedactedSessionHeaders(self)
+
+    def copy(self):
+        return RedactedSessionHeaders(self)
+
+
 @dataclass
 class SSSekaiDatabase:
     config: AbCacheConfig = None
@@ -349,6 +369,10 @@ class SSSekaiDatabase:
         if isinstance(self.sekai_user_data, dict):
             self.sekai_user_data = fromdict(
                 SekaiUserData, self.sekai_user_data, False
+            )
+        if isinstance(self.sekai_user_auth_data, dict):
+            self.sekai_user_auth_data = fromdict(
+                SekaiUserAuthData, self.sekai_user_auth_data, False
             )
         secrets = []
         if self.config is not None:
@@ -755,6 +779,9 @@ class AbCache(Session):
 
     def __init__(self, config: Optional[AbCacheConfig] = None):
         super().__init__()
+        # `requests` builds a plain CaseInsensitiveDict; replace it so tokens
+        # copied in by load()/update_signatures() stay out of repr and logs.
+        self.headers = RedactedSessionHeaders(self.headers)
         self.database = SSSekaiDatabase()
         self.config = config or AbCacheConfig(
             "unknown", "unknown", "unknown", "unknown"
