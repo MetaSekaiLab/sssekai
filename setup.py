@@ -35,9 +35,9 @@ setuptools.setup(
         "coloredlogs",
         "fsspec",
     ],
-    # NOTE: No `gui` extra on purpose. The GUI requires GooeyEx >= 0.1.1, which
-    # is not published on PyPI (0.1.0 crashes at import without a wx.App), and
-    # PyPI rejects direct-URL requirements. See README for manual installation.
+    # NOTE: No `gui` extra on purpose. The GUI requires GooeyEx, which is not
+    # distributed via PyPI (pip cannot resolve it), and PyPI rejects direct-URL
+    # requirements in extras. See README for the manual git installation.
     # The unused `criware` extra was removed with its dependency for the same
     # reason: PyCriCodecsEx is not installable and nothing imports it.
     extras_require={"il2cpp": ["lief"]},

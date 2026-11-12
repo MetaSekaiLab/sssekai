@@ -9,8 +9,8 @@ try:
     from GooeyEx import Gooey, GooeyParser
 except ImportError as e:
     print(
-        "The GUI requires GooeyEx >= 0.1.1, which is not published on PyPI.\n"
-        "Install it manually, then retry:\n"
+        "The GUI requires GooeyEx, which is not distributed via PyPI.\n"
+        "Install it from upstream, then retry:\n"
         '  pip install -U "GooeyEx @ git+https://github.com/mos9527/GooeyEx"\n'
         "Otherwise use the CLI executable from the Releases page.",
         file=sys.stderr,
