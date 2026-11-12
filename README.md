@@ -28,6 +28,15 @@ sssekai-gui
 ```
 
 If the import fails, check the installed version with `python -c "import GooeyEx; print(getattr(GooeyEx, '__version__', 'unknown'))"`. If git is unavailable, use the CLI executable from Releases instead.
+
+To build the GUI executable yourself, install GooeyEx from a clone with its submodules (`git clone --recurse-submodules https://github.com/mos9527/GooeyEx`) so `GooeyEx/images` is populated, then run `pyinstaller sssekai-gui.spec`. Images pulled from a plain `pip install` are incomplete.
+
+## Serving the cache (`abserve`)
+`sssekai abserve` serves the local AssetBundle cache over HTTP. It binds to `127.0.0.1` by default; pass `--host 0.0.0.0` to expose it to your network (anyone who can reach the port can read the cache and its credentials).
+
+```bash
+sssekai abserve --db ~/.sssekai/abcache.db
+```
 # 问题反馈
 使用问题和缺陷请提交至本仓库的 [Issues](https://github.com/MetaSekaiLab/sssekai/issues)。
 
