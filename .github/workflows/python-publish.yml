@@ -11,10 +11,6 @@ on:
         description: 'Build and release Windows executables'
         type: boolean
         default: false
-      release_gui:
-        description: 'Include Windows GUI executable (requires GooeyEx)'
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -85,14 +81,11 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: python -m pip install pyinstaller ".[il2cpp]"
-      - name: Install GUI dependencies
-        if: inputs.release_gui
-        run: python -m pip install ".[gui]"
+      # NOTE: The GUI executable is not built here: its dependency GooeyEx is not
+      # published on public PyPI. Build it locally with `pyinstaller sssekai-gui.spec`
+      # from an environment where GooeyEx is installed.
       - name: Build Windows executables
         run: pyinstaller sssekai.spec
-      - name: Build Windows GUI executable
-        if: inputs.release_gui
-        run: pyinstaller sssekai-gui.spec
       - name: Create GitHub release
         shell: pwsh
         env:

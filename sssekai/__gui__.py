@@ -9,9 +9,13 @@ try:
     from GooeyEx import Gooey, GooeyParser
 except ImportError as e:
     print(
-        "Please install sssekai[gui] through your Python package manager to use the GUI"
+        "The GUI requires GooeyEx >= 0.1.1, which is not published on PyPI.\n"
+        "Install it manually, then retry:\n"
+        '  pip install -U "GooeyEx @ git+https://github.com/mos9527/GooeyEx"\n'
+        "Otherwise use the CLI executable from the Releases page.",
+        file=sys.stderr,
     )
-    raise e
+    raise SystemExit(1) from e
 
 
 from sssekai.unity import sssekai_set_unity_version
