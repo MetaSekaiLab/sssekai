@@ -30,8 +30,9 @@ SEKAI_APIMANAGER_KEYSETS = {
     "jp": (b"g2fcC0ZczN9MTJ61", b"msx3IV0i9XE5uYZ1"),
     "tw": (b"g2fcC0ZczN9MTJ61", b"msx3IV0i9XE5uYZ1"),
     "kr": (b"g2fcC0ZczN9MTJ61", b"msx3IV0i9XE5uYZ1"),
-    # CN switched to a new keyset since app version 6.4.0.
+    # CN API servers switched to a new keyset since app version 6.4.0.
     # The server picks the keyset by the `X-App-Version` request header.
+    # The CN asset CDN (AssetBundleInfo, master data) still uses `cn-legacy`.
     "cn": (b"PFSeUG9v6MpohZKO", b"rJn6VC6vJhEX2xLO"),
     "cn-legacy": (b"g2fcC0ZczN9MTJ61", b"msx3IV0i9XE5uYZ1"),
 }
@@ -49,12 +50,24 @@ def _parse_version(version: str) -> Tuple[int, ...]:
     return tuple(parts)
 
 
-def get_keyset(region: str, app_version: Optional[str] = None) -> Tuple[bytes, bytes]:
-    """Get the APIManager keyset for a region and (optionally) an app version."""
-    if region == "cn" and app_version:
-        parsed = _parse_version(app_version)
-        if parsed and parsed < CN_KEYSET_SWITCH_VERSION:
+def get_keyset(
+    region: str, app_version: Optional[str] = None, cdn: bool = False
+) -> Tuple[bytes, bytes]:
+    """Get the APIManager keyset for a region.
+
+    Args:
+        region: App region.
+        app_version: App version. CN API servers switched keysets since 6.4.0.
+        cdn: Whether the payload comes from the asset CDN (e.g. AssetBundleInfo).
+            The CN CDN still serves payloads encrypted with the legacy keyset.
+    """
+    if region == "cn":
+        if cdn:
             return SEKAI_APIMANAGER_KEYSETS["cn-legacy"]
+        if app_version:
+            parsed = _parse_version(app_version)
+            if parsed and parsed < CN_KEYSET_SWITCH_VERSION:
+                return SEKAI_APIMANAGER_KEYSETS["cn-legacy"]
     return SEKAI_APIMANAGER_KEYSETS[region]
 
 
