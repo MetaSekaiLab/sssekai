@@ -12,16 +12,27 @@ archspec_path = module_path_func(archspec)
 gooeyex_path = module_path_func(GooeyEx)
 block_cipher = None
 
+
+def existing(*paths):
+    """Keep only datas entries whose source exists.
+
+    GooeyEx pulls `images/` from a git submodule (chriskiehl/GooeyImages) that
+    is not vendored in the wheel, so a plain `pip install` leaves the directory
+    empty or missing. Bundling it unconditionally makes PyInstaller fail.
+    """
+    return [(src, dest) for src, dest in paths if os.path.exists(src)]
+
+
 a = Analysis(
     ["sssekai\\__gui__.py"],
     pathex=[],
     binaries=[],
-    datas=[
-        (unitypy_path("resources/*"), "UnityPy/resources"),        
+    datas=existing(
+        (unitypy_path("resources/*"), "UnityPy/resources"),
         (archspec_path('json'), 'archspec/json'),
         (gooeyex_path('images'), 'GooeyEx/images'),
-        (gooeyex_path('languages'), 'GooeyEx/languages'),        
-    ],
+        (gooeyex_path('languages'), 'GooeyEx/languages'),
+    ),
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

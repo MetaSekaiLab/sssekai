@@ -1,10 +1,14 @@
 from base64 import b64decode, b64encode
 from struct import unpack as s_unpack
+import struct, zlib
 from io import BytesIO
 from collections import defaultdict
 from typing import Generator, Tuple, TypeVar, List
+from logging import getLogger
 import math, gzip
 import msgpack
+
+logger = getLogger(__name__)
 
 RLA_VERSIONS = [(1, 0), (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7)]
 
@@ -30,6 +34,30 @@ class SSEMissingSplitPacketException(Exception):
     def __init__(self, missing):
         self.missing = missing
         super().__init__(f"Missing %d split packet(s): %s" % (len(missing), missing))
+
+
+class StreamingDataTruncatedException(Exception):
+    """Raised when a payload is incomplete or corrupt and cannot be decoded
+    in full. In non-strict mode callers drop the whole frame rather than
+    returning a silently shortened one."""
+
+
+# Errors that indicate a bad packet. Anything else (TypeError, AttributeError,
+# ...) is a bug in this decoder and must not be silently swallowed. Shared by
+# `decode_streaming_data` and `read_rla_frames` so the two agree on what
+# counts as a corrupt packet rather than a decoder bug.
+DECODE_ERRORS = (
+    AssertionError,
+    IndexError,
+    KeyError,
+    ValueError,
+    UnicodeError,
+    EOFError,
+    struct.error,
+    gzip.BadGzipFile,
+    zlib.error,
+    StreamingDataTruncatedException,
+)
 
 
 # Sekai_Streaming_StreamingCommon__CheckHeader
@@ -124,10 +152,11 @@ def decode_streaming_data(
         version (tuple): RLA version
         decoder_signature (int): Decoder signature
         buffer (bytes): Decoded payload data
-        strict (bool, optional): If False, incomplete packets will be returned as is. Defaults to True.
+        strict (bool, optional): If False, truncated arrays raise StreamingDataTruncatedException instead of propagating the underlying error. The bitmask header and scalar fields are not covered: they are decoded before the array wrapper, so a packet truncated there raises the underlying IndexError/struct.error in either mode. Defaults to True.
 
     Raises:
         Exception: If the packet is incomplete and strict is True.
+        StreamingDataTruncatedException: If an array is truncated and strict is False.
 
     Returns:
         dict: Parsed streaming data payload
@@ -227,16 +256,20 @@ def decode_streaming_data(
     )  # ReadString
 
     # HACK: Workaround for incomplete packets.
+    # In non-strict mode a truncated array aborts the whole frame instead of
+    # being silently returned as a shorter one: callers must be able to tell a
+    # complete frame from a truncated one (see StreamingDataTruncatedException).
     def gen_exception_handler(generator):
         try:
             for item in generator:
                 yield item
-        except Exception as e:
+        except StreamingDataTruncatedException:
+            raise
+        except DECODE_ERRORS as e:
             # XXX: This shouldn't happen unless the packet is corrupted.
             if strict:
                 raise e
-            else:
-                return
+            raise StreamingDataTruncatedException(str(e)) from e
 
     gen_get_next_array = lambda reader: (
         reader() for _ in range(get_next_int())
@@ -433,7 +466,7 @@ def read_rla_frames(
     Args:
         reader (Generator[Tuple[T, bytes], None, None]): A generator that yields a tuple of timestamp and buffer data
         version (tuple, optional): RLA version, found in respective RLH (JSON) header files. range: see RLA_VERSIONS. Defaults to (1,0).
-        strict (bool, optional): If False, incomplete packets will be returned as is. Defaults to True.
+        strict (bool, optional): If False, malformed or incomplete packets are skipped instead of raising. Defaults to True.
 
     Yields:
         Generator[Tuple[T, dict], None, None]: A generator that yields a tuple of timestamp and parsed frame data. Timestamp format is provided by the reader.
@@ -453,34 +486,105 @@ def read_rla_frames(
         payload = decode_streaming_data(version, decoder_signature, data, strict)
         return payload
 
+    skipped = 0
+
+    def decode_or_skip(header_signature, data):
+        """Decode a packet, or return None to skip it when not in strict mode."""
+        nonlocal skipped
+        try:
+            return decode_buffer(header_signature, data)
+        except DECODE_ERRORS as e:
+            if strict:
+                raise
+            logger.debug("Skipping undecodable RLA packet: %s", e)
+            skipped += 1
+            return None
+
     for timestamp, buffer in reader:
         try:
             split_info, header_signature, data = decode_buffer_base64(buffer)
-        except Exception as e:
+        except DECODE_ERRORS as e:
             if strict:
                 raise e
-            # Otherwise fail silently
+            # A packet that fails to parse has no trustworthy splitId, so it
+            # cannot be matched against pending __buffers entries. Drop every
+            # pending group instead of keeping them: a stale group can
+            # otherwise be completed by fragments of a different frame that
+            # happens to reuse the same splitId, producing a spliced frame that
+            # still passes the length check. Dropping is the safe direction for
+            # a non-strict export.
+            if __buffers:
+                logger.debug(
+                    "Dropping %d pending split group(s) after malformed packet",
+                    len(__buffers),
+                )
+                __buffers.clear()
+            logger.debug("Skipping malformed RLA packet: %s", e)
+            skipped += 1
+            continue
         if split_info:
             splitId, splitIndex, splitNum, dataLength, totalDataLength, base64 = (
                 split_info
             )
-            __buffers[splitId].append((timestamp, split_info, header_signature, data))
-            if len(__buffers[splitId]) == splitNum:
+            entries = __buffers[splitId]
+            # A splitIndex that repeats means the buffered fragment belongs to
+            # an earlier frame that was never completed (e.g. one fragment was
+            # lost). Keeping both would splice two frames into a chimera, so
+            # discard everything buffered and start over from this fragment.
+            if any(info[1] == splitIndex for _, info, _, _ in entries):
+                logger.debug(
+                    "Discarding stale split group %s at duplicate index %d",
+                    splitId,
+                    splitIndex,
+                )
+                entries.clear()
+                skipped += 1
+            entries.append((timestamp, split_info, header_signature, data))
+            if len(entries) == splitNum:
+                del __buffers[splitId]
+                if strict:
+                    assert (
+                        sorted(info[1] for _, info, _, _ in entries)
+                        == list(range(splitNum))
+                    ), "missing/duplicate split packet(s)"
                 buffer = b"".join(
                     data
-                    for _, _, _, data in sorted(
-                        __buffers[splitId], key=lambda x: x[1][1]
-                    )  # splitIndex
-                )
+                    for _, _, _, data in sorted(entries, key=lambda x: x[1][1])
+                )  # splitIndex
                 if strict:
                     assert len(buffer) == totalDataLength, "incomplete split packet"
-                del __buffers[splitId]
+                elif len(buffer) != totalDataLength:
+                    logger.debug(
+                        "Skipping incomplete split packet %s (%d/%d bytes)",
+                        splitId,
+                        len(buffer),
+                        totalDataLength,
+                    )
+                    skipped += 1
+                    continue
                 if base64:
-                    buffer = b64decode(buffer)
-                yield timestamp, decode_buffer(header_signature, buffer)
+                    try:
+                        buffer = b64decode(buffer)
+                    except Exception as e:
+                        if strict:
+                            raise e
+                        logger.debug(
+                            "Skipping split packet %s with malformed base64: %s",
+                            splitId,
+                            e,
+                        )
+                        skipped += 1
+                        continue
+                payload = decode_or_skip(header_signature, buffer)
+                if payload is not None:
+                    yield timestamp, payload
         else:
-            yield timestamp, decode_buffer(header_signature, data)
+            payload = decode_or_skip(header_signature, data)
+            if payload is not None:
+                yield timestamp, payload
 
+    if skipped:
+        logger.warning("Skipped %d undecodable RLA packet(s)", skipped)
     if __buffers and strict:
         missing = [(payload[0][0], splitId) for splitId, payload in __buffers.items()]
         raise SSEMissingSplitPacketException(missing)
@@ -496,7 +600,7 @@ def read_archive_rla_frames(
     Args:
         src (BytesIO): Source RLA file stream
         version (tuple, optional): RLA version, found in respective RLH (JSON) header files. range: see RLA_VERSIONS. Defaults to (1,0).
-        strict (bool, optional): If False, incomplete packets will be returned as is. Defaults to True.
+        strict (bool, optional): If False, malformed or incomplete packets are skipped instead of raising. Defaults to True.
 
     Yields:
         Generator[Tuple[int, dict], None, None]: A generator that yields a tuple of timestamp and parsed frame data

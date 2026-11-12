@@ -2,13 +2,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Animation Plot",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/misc/animation_plot.py",
-            "justMyCode": false
-        },
-        {
             "name": "AbCache Availability Check",
             "type": "debugpy",
             "request": "launch",
@@ -271,33 +264,9 @@
             "name": "Python: Tests",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/sssekai.test.py",
+            "module": "pytest",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            "justMyCode": false
-        },
-        {
-            "name": "Python: Convert Sekai Character Mesh",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/sssekai/scripts/blender_mesh_importer.py",
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "args": [
-                "C:\\Users\\mos9527\\.sssekai\\abcache\\live_pv\\model\\character\\body\\21\\0001\\ladies_s"
-            ],
-            "justMyCode": false
-        },
-        {
-            "name": "Python: Dump Live2D Model Parameter names",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/sssekai/scripts/dump_moc3_assets.py",
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "args": [
-                "C:\\Users\\mos9527\\.sssekai\\abcache\\live2d\\model"
-            ],
             "justMyCode": false
         },
         {
@@ -354,17 +323,6 @@
             "justMyCode": true
         },
         {
-            "name": "Python: live2dextract Generic",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/sssekai/scripts/live2dextract_generic.py",
-            "args": [
-                "C:\\Users\\Huang\\Desktop\\Data",
-                "C:\\Users\\Huang\\Desktop\\Data_result"
-            ],
-            "justMyCode": false
-        },
-        {
             "name": "Python: rla2json",
             "type": "python",
             "request": "launch",
@@ -378,15 +336,6 @@
                 "--strict"
             ],
             "justMyCode": true
-        },
-        {
-            "name": "Python: Test Animation",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/test.animation.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": []
         },
         {
             "name": "Python: RLA Test (Single File)",

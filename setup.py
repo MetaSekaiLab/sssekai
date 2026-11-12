@@ -35,7 +35,12 @@ setuptools.setup(
         "coloredlogs",
         "fsspec",
     ],
-    extras_require={"gui": ["GooeyEx>=0.1.1"], "il2cpp": ["lief"], "criware": ["PyCriCodecsEx"]},
+    # NOTE: No `gui` extra on purpose. The GUI requires GooeyEx, which is not
+    # distributed via PyPI (pip cannot resolve it), and PyPI rejects direct-URL
+    # requirements in extras. See README for the manual git installation.
+    # The unused `criware` extra was removed with its dependency for the same
+    # reason: PyCriCodecsEx is not installable and nothing imports it.
+    extras_require={"il2cpp": ["lief"]},
     entry_points={
         "console_scripts": [
             "sssekai = sssekai.__main__:__main__",

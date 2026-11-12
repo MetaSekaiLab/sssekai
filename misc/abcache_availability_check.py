@@ -14,7 +14,7 @@ if UPDATE:
         AbCacheConfig(
             app_region="kr",
             app_version="3.4.3",
-            ab_version="3.4.0",
+            row_ab_version="3.4.0",
             app_hash="4d9acca8-553f-c3f4-398b-a678e32e7f85",
             app_platform="android",
         )
