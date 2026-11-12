@@ -119,7 +119,7 @@ This crypto applies to:
     apidecrypt_parser.add_argument(
         "--region",
         type=str,
-        help="app region (use `cn-legacy` for CN app versions before 6.4.0)",
+        help="app region (`cn` is for CN API responses since 6.4.0; use `cn-legacy` for CN AssetBundleInfo/CDN files and older API responses)",
         default="jp",
         choices=["jp", "tw", "en", "kr", "cn", "cn-legacy"],
     )

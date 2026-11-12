@@ -535,6 +535,13 @@ class AbCache(Session):
     def abcache_index(self):
         return self.database.sekai_abcache_index
 
+    def _keyset(self, url: str):
+        """APIManager keyset for a request/response URL."""
+        cdn = False
+        if self.config.app_region == "cn":
+            cdn = not url.startswith(self.SEKAI_API_ENDPOINT)
+        return get_keyset(self.config.app_region, self.config.app_version, cdn=cdn)
+
     def request_packed(self, method: str, url: str, data: dict = None, **kwargs):
         """Send a request with packed data. Data will be packed and encrypted before sending.
 
@@ -565,7 +572,7 @@ class AbCache(Session):
             # But this may change in the future, in which case consult the following issues:
             #   https://github.com/msgpack/msgpack-python/issues/326
             data = packb(data, use_single_float=True)
-            data = encrypt(data, get_keyset(self.config.app_region, self.config.app_version))
+            data = encrypt(data, self._keyset(url))
         resp = self.request(method=method, url=url, data=data, **kwargs)
         if 400 <= resp.status_code < 600:
             logger.error(f"{method} {url} {resp.status_code}")
@@ -590,7 +597,7 @@ class AbCache(Session):
         Returns:
             dict: Decrypted and unpacked data
         """
-        data = decrypt(resp.content, get_keyset(self.config.app_region, self.config.app_version))
+        data = decrypt(resp.content, self._keyset(resp.url))
         data = unpackb(data, **kwargs)
         return data
 
