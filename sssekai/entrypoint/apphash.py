@@ -261,7 +261,7 @@ Reported Package: {config.bundleIdentifier}
         AbCacheConfig(
             app_region="{region}",
             app_version="{app_version}",
-            ab_version="{ab_version}",
+            row_ab_version="{ab_version}",
             app_hash="{app_hash}",
             app_platform="{platform}"
         )

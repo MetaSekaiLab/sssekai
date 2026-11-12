@@ -178,7 +178,7 @@ This crypto applies to:
     )
     group = abcache_parser.add_argument_group(
         "game version options",
-        "NOTE: these options are used to *update* the cache database. Use --no-update to skip updating. Also, you may want to read the Wiki to know how to get these values.",
+        "NOTE: these options are used to *update* the cache database. Use --no-update to skip updating. You can obtain these values with the `apphash` subcommand.",
     )
     group.add_argument(
         "--app-region",
@@ -329,8 +329,8 @@ This crypto applies to:
     abserve_parser.add_argument(
         "--host",
         type=str,
-        help="""address of the interface to listen on (default: %(default)s)""",
-        default="0.0.0.0",
+        help="""address of the interface to listen on (default: %(default)s). Use 0.0.0.0 to expose the server to the network.""",
+        default="127.0.0.1",
     )
     abserve_parser.add_argument(
         "--port",

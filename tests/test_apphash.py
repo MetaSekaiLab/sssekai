@@ -11,5 +11,14 @@ def test_apphash():
     )
 
 
+def test_abserve_host_defaults_to_loopback():
+    """abserve used to bind 0.0.0.0, exposing the local cache to the LAN."""
+    from sssekai.__main__ import create_parser
+
+    parser = create_parser()
+    args = parser.parse_args(["abserve"])
+    assert args.host == "127.0.0.1"
+
+
 if __name__ == "__main__":
     test_apphash()
