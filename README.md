@@ -20,14 +20,14 @@ To use the latest development version, you can install directly from GitHub:
 pip install -U git+https://github.com/MetaSekaiLab/sssekai
 ```
 ## Using the GUI version
-The GUI depends on [GooeyEx](https://github.com/mos9527/GooeyEx/) **>= 0.1.1**, which is not published on PyPI. Install it manually from upstream (a `git` executable and network access are required), then run the GUI:
+The GUI depends on [GooeyEx](https://github.com/mos9527/GooeyEx/), which is **not published on PyPI at all**. Install it from upstream (a `git` executable and network access are required), then run the GUI:
 
 ```bash
 pip install -U "GooeyEx @ git+https://github.com/mos9527/GooeyEx"
 sssekai-gui
 ```
 
-`GooeyEx` 0.1.0 (the newest version on PyPI) crashes on import; verify you got 0.1.1 or newer with `python -c "import GooeyEx; print(GooeyEx.__version__)"`. If git is unavailable, use the CLI executable from Releases instead.
+If the import fails, check the installed version with `python -c "import GooeyEx; print(getattr(GooeyEx, '__version__', 'unknown'))"`. If git is unavailable, use the CLI executable from Releases instead.
 # 问题反馈
 使用问题和缺陷请提交至本仓库的 [Issues](https://github.com/MetaSekaiLab/sssekai/issues)。
 
